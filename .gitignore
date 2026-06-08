@@ -1,6 +1,19 @@
-__pycache__/
+﻿__pycache__/
 *.py[cod]
-*$py.class
+*.class
 
 # Generated output (user-specific site data)
 output/
+
+# AI configs, logs and chats
+.cursor/
+.cursorrules
+.gemini/
+.aider*
+*.ai*
+.chat/
+chat-history.json
+.agy/
+.antigravity/
+docs/
+brain/
