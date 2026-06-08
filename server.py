@@ -490,6 +490,7 @@ def build_card_html(game):
 
     tags_html = ''.join(f'<span class="card-tag">{t}</span>' for t in tags[:4])
     platform = game.get('platform', '')
+    school_class = game.get('school_class', '')
     author = game.get('author', '')
     desc = game.get('description', '')
     engine = game.get('engine', '')
@@ -499,6 +500,7 @@ def build_card_html(game):
     <div class="card-image">
       {img_html}
       <span class="status-badge {status}">{status_label}</span>
+      {f'<span class="platform-badge" style="background:var(--accent-cool);color:black;">{school_class}</span>' if school_class else ''}
       {f'<span class="platform-badge">{platform}</span>' if platform else ''}
     </div>
     <div class="card-body">
@@ -1593,8 +1595,6 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         if path == '/api/games':
             if method == 'GET':
                 games = get_games()
-                if user['role'] != 'admin':
-                    games = [g for g in games if g.get('owner_id') == user['id']]
                 self.send_json(games)
                 return True
             elif method == 'POST':
@@ -1638,6 +1638,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     'itch_url': data.get('itch_url', ''),
                     'youtube_url': data.get('youtube_url', ''),
                     'visible': data.get('visible', True),
+                    'school_class': data.get('school_class', ''),
                     'owner_id': user['id'],
                 }
                 # Create game folder
@@ -2031,6 +2032,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                 'itch_url': game_data.get('itch_url', ''),
                 'youtube_url': game_data.get('youtube_url', ''),
                 'visible': True,
+                'school_class': game_data.get('school_class', ''),
                 'owner_id': user['id'],
             }
 

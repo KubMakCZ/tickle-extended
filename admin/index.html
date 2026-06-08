@@ -876,6 +876,10 @@
           <input class="form-input" id="newGameTitle" placeholder="My Awesome Game" required oninput="updateSlugPreview()">
           <div class="slug-preview" id="slugPreview"></div>
         </div>
+        <div class="form-group">
+          <label>Třída (Class)</label>
+          <input class="form-input" id="newGameClass" placeholder="např. 1.I">
+        </div>
         <div class="form-row">
           <button type="submit" class="btn btn-primary" style="justify-content:center;">Create</button>
           <button type="button" class="btn btn-secondary" style="justify-content:center;" onclick="showView('games')">Cancel</button>
@@ -1198,12 +1202,16 @@ async function loadGameList() {
       ? '<img src="/preview/games/' + g.slug + '/' + g.icon + '" alt="">'
       : '<span class="letter">' + (g.title || '?')[0] + '</span>';
 
-    return '<div class="game-list-card" onclick="editGame(\'' + g.slug + '\')">' +
+    var canEdit = (g.owner_id === window.currentUser.id || window.currentUser.role === 'admin');
+    var clickAction = canEdit ? "editGame('" + g.slug + "')" : "window.open('/preview/games/" + g.slug + "/')";
+
+    return '<div class="game-list-card" onclick="' + clickAction + '">' +
       '<div class="game-list-icon">' + icon + '</div>' +
       '<div class="game-list-info">' +
         '<div class="game-list-title">' + esc(g.title || g.slug) + '</div>' +
         '<div class="game-list-meta">' +
           '<span class="status-pill ' + status + '">' + (statusLabels[status] || status) + '</span>' +
+          (g.school_class ? '<span class="engine-badge" style="background:var(--accent-cool);color:black;">' + esc(g.school_class) + '</span>' : '') +
           (g.engine ? '<span class="engine-badge">' + esc(g.engine) + '</span>' : '') +
           (g.game_file ? '<span style="color:var(--accent-green);">playable</span>' : '') +
           (g.visible === false ? '<span style="color:var(--text-muted);font-style:italic;">unlisted</span>' : '') +
@@ -1211,9 +1219,10 @@ async function loadGameList() {
           '<span>' + (g.date_updated || '') + '</span>' +
         '</div>' +
       '</div>' +
+      (canEdit ?
       '<div class="game-list-actions">' +
         '<button class="icon-btn delete" onclick="event.stopPropagation();deleteGame(\'' + g.slug + '\',\'' + esc(g.title) + '\')" title="Delete">&times;</button>' +
-      '</div>' +
+      '</div>' : '') +
     '</div>';
   }).join('');
 }
@@ -1240,7 +1249,9 @@ async function createGame(e) {
   var title = document.getElementById('newGameTitle').value.trim();
   if (!title) return;
 
-  var result = await api('/games', { method: 'POST', body: JSON.stringify({ title: title }) });
+  var schoolClass = document.getElementById('newGameClass').value.trim();
+
+  var result = await api('/games', { method: 'POST', body: JSON.stringify({ title: title, school_class: schoolClass }) });
   if (result.error) { toast(result.error, 'error'); return; }
 
   toast('Game created!', 'success');
@@ -1354,6 +1365,7 @@ function renderBasicSection(game) {
     '<div class="form-row">' +
       fg('Slug', '<input class="form-input" value="' + esc(game.slug) + '" disabled>') +
       fg('Author', '<input class="form-input" value="' + esc(game.author) + '" onchange="updateField(\'author\', this.value)">') +
+      fg('Třída (Class)', '<input class="form-input" value="' + esc(game.school_class || '') + '" onchange="updateField(\'school_class\', this.value)">') +
     '</div>' +
     fg('Short Description', '<input class="form-input" value="' + esc(game.description) + '" onchange="updateField(\'description\', this.value)">') +
     fg('Full Description (HTML allowed)', '<textarea class="form-textarea" style="min-height:120px;" onchange="updateField(\'long_description\', this.value)">' + esc(game.long_description) + '</textarea>') +
