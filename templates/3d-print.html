@@ -303,7 +303,7 @@
 <!--ENDIF:screenshots-->
 
 <script>
-(function(){try{var h=location.hostname;if(h&&h!=='localhost'&&h!=='127.0.0.1'){var x=new XMLHttpRequest();x.open('GET',location.origin+'/api/hit/{{slug}}');x.send();}}catch(e){}})();
+(function(){try{var h=location.hostname;if(h){var x=new XMLHttpRequest();x.open('GET',location.origin+'/api/hit/{{slug}}');x.send();}}catch(e){}})();
 </script>
 
 <!--IF:viewer_file-->

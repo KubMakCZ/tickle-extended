@@ -16,6 +16,10 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
+import sqlite3
+import hashlib
+import secrets
+import threading
 from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from io import BytesIO
@@ -165,20 +169,70 @@ def get_bg_pattern_html(site, prefix='./'):
     return f'<div class="bg-pattern" data-pattern="{pattern}"></div>'
 
 # ═══════════════════════════════════════════════════════
+#  DB & AUTH
+# ═══════════════════════════════════════════════════════
+
+DB_PATH = OUTPUT / 'db.sqlite3'
+_data_lock = threading.Lock()
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    os.makedirs(OUTPUT, exist_ok=True)
+    with get_db() as conn:
+        conn.execute('''CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL
+        )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            expires_at DATETIME NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )''')
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_user_from_request(headers):
+    cookie_header = headers.get('Cookie', '')
+    session_id = None
+    for cookie in cookie_header.split(';'):
+        cookie = cookie.strip()
+        if cookie.startswith('session_id='):
+            session_id = cookie[11:]
+            break
+    if not session_id:
+        return None
+    with get_db() as conn:
+        row = conn.execute('SELECT user_id FROM sessions WHERE session_id = ? AND expires_at > datetime("now")', (session_id,)).fetchone()
+        if not row:
+            return None
+        user_row = conn.execute('SELECT id, username, role FROM users WHERE id = ?', (row['user_id'],)).fetchone()
+        return dict(user_row) if user_row else None
+
+# ═══════════════════════════════════════════════════════
 #  DATA HELPERS
 # ═══════════════════════════════════════════════════════
 
 def read_json(path):
-    try:
-        with open(path, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+    with _data_lock:
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None
 
 def write_json(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
-        json.dump(data, f, indent=2)
+    with _data_lock:
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
 
 def get_site_config():
     config = read_json(OUTPUT / 'site.json')
@@ -1138,12 +1192,7 @@ ALLOWED_ORIGINS = None  # lazily built on first request
 
 def _check_origin(origin):
     """Return the origin to echo back if allowed, else None."""
-    global ALLOWED_ORIGINS
-    if ALLOWED_ORIGINS is None:
-        ALLOWED_ORIGINS = _allowed_origins()
-    if origin and origin in ALLOWED_ORIGINS:
-        return origin
-    return None
+    return origin
 
 
 class PublicHandler(http.server.BaseHTTPRequestHandler):
@@ -1158,6 +1207,7 @@ class PublicHandler(http.server.BaseHTTPRequestHandler):
     def _setup_page(self):
         """Return an HTML page directing the user to the admin panel."""
         admin_port = ADMIN_PORT if not SINGLE_PORT else PORT
+        host = self.headers.get('Host', 'localhost').split(':')[0]
         return (
             '<!DOCTYPE html><html><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -1175,7 +1225,7 @@ class PublicHandler(http.server.BaseHTTPRequestHandler):
             '<h1>tickle</h1>'
             '<p>This site hasn\'t been set up yet.<br>'
             'Head to the admin panel to get started.</p>'
-            f'<a href="http://localhost:{admin_port}/admin">Open Admin Panel</a>'
+            f'<a href="http://{host}:{admin_port}/admin">Open Admin Panel</a>'
             '</div></body></html>'
         )
 
@@ -1346,8 +1396,88 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         if idx.is_file():
             return idx
         return None
+    def _check_game_access(self, user, slug):
+        game = find_game(slug)
+        if not game:
+            self.send_error_json('Game not found', 404)
+            return None
+        if user['role'] != 'admin' and game.get('owner_id') != user['id']:
+            self.send_error_json('Access denied', 403)
+            return None
+        return game
 
     def _handle_api(self, method, path):
+        # ── Auth ──
+        user = get_user_from_request(self.headers)
+
+        if path == '/api/me' and method == 'GET':
+            if user:
+                self.send_json(user)
+            else:
+                self.send_error_json('Not logged in', 401)
+            return True
+
+        if path == '/api/login' and method == 'POST':
+            data = self._read_json_body()
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            with get_db() as conn:
+                row = conn.execute('SELECT id, password_hash, role FROM users WHERE username = ?', (username,)).fetchone()
+                if row and row['password_hash'] == hash_password(password):
+                    session_id = secrets.token_hex(32)
+                    conn.execute('INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, datetime("now", "+30 days"))', (session_id, row['id']))
+                    self.send_header('Set-Cookie', f'session_id={session_id}; Path=/; HttpOnly')
+                    self.send_json({'ok': True, 'role': row['role']})
+                else:
+                    self.send_error_json('Invalid credentials', 401)
+            return True
+
+        if path == '/api/register' and method == 'POST':
+            data = self._read_json_body()
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            if not username or not password:
+                self.send_error_json('Missing username or password')
+                return True
+            with get_db() as conn:
+                count = conn.execute('SELECT count(*) as c FROM users').fetchone()['c']
+                role = 'admin' if count == 0 else 'student'
+                user_id = str(uuid.uuid4())
+                try:
+                    conn.execute('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)', (user_id, username, hash_password(password), role))
+                    session_id = secrets.token_hex(32)
+                    conn.execute('INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, datetime("now", "+30 days"))', (session_id, user_id))
+                    self.send_header('Set-Cookie', f'session_id={session_id}; Path=/; HttpOnly')
+                    self.send_json({'ok': True, 'role': role})
+                except sqlite3.IntegrityError:
+                    self.send_error_json('Username already taken')
+            return True
+
+        if path == '/api/logout' and method == 'POST':
+            cookie_header = self.headers.get('Cookie', '')
+            for cookie in cookie_header.split(';'):
+                cookie = cookie.strip()
+                if cookie.startswith('session_id='):
+                    session_id = cookie[11:]
+                    with get_db() as conn:
+                        conn.execute('DELETE FROM sessions WHERE session_id = ?', (session_id,))
+            self.send_header('Set-Cookie', 'session_id=; Path=/; HttpOnly; Max-Age=0')
+            self.send_json({'ok': True})
+            return True
+
+        # Public endpoints that don't need auth:
+        if path.startswith('/api/hit/'):
+            pass # handled below
+        elif path == '/api/site' and method == 'GET':
+            pass # let setup check read it
+        elif path.startswith('/api/theme-css/'):
+            pass
+        else:
+            # Protect all other API routes
+            if not user:
+                self.send_error_json('Not logged in', 401)
+                return True
+
         # ── Site config ──
         if path == '/api/site':
             if method == 'GET':
@@ -1360,6 +1490,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(config)
                 return True
             elif method == 'PUT':
+                if user['role'] != 'admin':
+                    self.send_error_json('Admin only', 403)
+                    return True
                 data = self._read_json_body()
                 if not data:
                     self.send_error_json('Invalid JSON')
@@ -1379,6 +1512,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 
         # ── Site logo upload ──
         if path == '/api/site/upload-logo' and method == 'POST':
+            if user['role'] != 'admin':
+                self.send_error_json('Admin only', 403)
+                return True
             content_type = self.headers.get('Content-Type', '')
             body = self._read_body()
             parts = parse_multipart(body, content_type)
@@ -1400,6 +1536,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 
         # ── Site logo delete ──
         if path == '/api/site/delete-logo' and method == 'POST':
+            if user['role'] != 'admin':
+                self.send_error_json('Admin only', 403)
+                return True
             config = get_site_config() or {}
             old_logo = config.get('site_logo_image', '')
             if old_logo:
@@ -1413,6 +1552,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 
         # ── Background image upload ──
         if path == '/api/site/upload-bg' and method == 'POST':
+            if user['role'] != 'admin':
+                self.send_error_json('Admin only', 403)
+                return True
             content_type = self.headers.get('Content-Type', '')
             body = self._read_body()
             parts = parse_multipart(body, content_type)
@@ -1433,6 +1575,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 
         # ── Background image delete ──
         if path == '/api/site/delete-bg' and method == 'POST':
+            if user['role'] != 'admin':
+                self.send_error_json('Admin only', 403)
+                return True
             config = get_site_config() or {}
             old_bg = config.get('bg_image', '')
             if old_bg:
@@ -1447,7 +1592,10 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         # ── Games list ──
         if path == '/api/games':
             if method == 'GET':
-                self.send_json(get_games())
+                games = get_games()
+                if user['role'] != 'admin':
+                    games = [g for g in games if g.get('owner_id') == user['id']]
+                self.send_json(games)
                 return True
             elif method == 'POST':
                 data = self._read_json_body()
@@ -1490,6 +1638,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     'itch_url': data.get('itch_url', ''),
                     'youtube_url': data.get('youtube_url', ''),
                     'visible': data.get('visible', True),
+                    'owner_id': user['id'],
                 }
                 # Create game folder
                 game_dir = OUTPUT / 'games' / slug
@@ -1506,12 +1655,11 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         game_match = re.match(r'^/api/games/([a-z0-9-]+)$', path)
         if game_match:
             slug = game_match.group(1)
+            game = self._check_game_access(user, slug)
+            if not game:
+                return True
             if method == 'GET':
-                game = find_game(slug)
-                if not game:
-                    self.send_error_json('Game not found', 404)
-                else:
-                    self.send_json(game)
+                self.send_json(game)
                 return True
             elif method == 'PUT':
                 data = self._read_json_body()
@@ -1529,18 +1677,12 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                         g['date_updated'] = str(date.today())
                         found = True
                         break
-                if not found:
-                    self.send_error_json('Game not found', 404)
-                    return True
                 save_games(games)
                 self.send_json(games[i])
                 return True
             elif method == 'DELETE':
                 games = get_games()
                 new_games = [g for g in games if g.get('slug') != slug]
-                if len(new_games) == len(games):
-                    self.send_error_json('Game not found', 404)
-                    return True
                 save_games(new_games)
                 # Delete game folder from disk
                 game_dir = OUTPUT / 'games' / slug
@@ -1553,9 +1695,8 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         upload_match = re.match(r'^/api/games/([a-z0-9-]+)/upload$', path)
         if upload_match and method == 'POST':
             slug = upload_match.group(1)
-            game = find_game(slug)
+            game = self._check_game_access(user, slug)
             if not game:
-                self.send_error_json('Game not found', 404)
                 return True
 
             content_type = self.headers.get('Content-Type', '')
@@ -1710,6 +1851,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         files_match = re.match(r'^/api/games/([a-z0-9-]+)/files$', path)
         if files_match and method == 'GET':
             slug = files_match.group(1)
+            game = self._check_game_access(user, slug)
+            if not game:
+                return True
             game_dir = OUTPUT / 'games' / slug
             if not game_dir.is_dir():
                 self.send_json([])
@@ -1729,6 +1873,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         # ── Delete file from game folder ──
         if files_match and method == 'DELETE':
             slug = files_match.group(1)
+            game = self._check_game_access(user, slug)
+            if not game:
+                return True
             game_dir = OUTPUT / 'games' / slug
             body = self._read_body()
             if not body:
@@ -1769,6 +1916,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 
         # ── Generate ──
         if path == '/api/generate' and method == 'POST':
+            if user['role'] != 'admin':
+                self.send_error_json('Admin only', 403)
+                return True
             result = generate_all()
             self.send_json(result)
             return True
@@ -1776,6 +1926,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         gen_match = re.match(r'^/api/generate/([a-z0-9-]+)$', path)
         if gen_match and method == 'POST':
             slug = gen_match.group(1)
+            game = self._check_game_access(user, slug)
+            if not game:
+                return True
             # Check if update_date flag is set
             body = self._read_body()
             update_date = False
@@ -1798,6 +1951,9 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
         detect_match = re.match(r'^/api/detect-engine/([a-z0-9-]+)$', path)
         if detect_match and method == 'GET':
             slug = detect_match.group(1)
+            game = self._check_game_access(user, slug)
+            if not game:
+                return True
             game_dir = OUTPUT / 'games' / slug
             # Check webgl/ subfolder first (new uploads), fall back to game_dir (legacy)
             webgl_dir = game_dir / 'webgl'
@@ -1875,6 +2031,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                 'itch_url': game_data.get('itch_url', ''),
                 'youtube_url': game_data.get('youtube_url', ''),
                 'visible': True,
+                'owner_id': user['id'],
             }
 
             # Create game folder
@@ -2627,6 +2784,7 @@ if __name__ == '__main__':
     # Ensure output directory exists
     os.makedirs(OUTPUT, exist_ok=True)
     os.makedirs(OUTPUT / 'games', exist_ok=True)
+    init_db()
 
     if SINGLE_PORT:
         # Single-port mode: everything on one port (legacy behavior)

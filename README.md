@@ -1,5 +1,7 @@
 # tickle
 
+*For Czech documentation, see [README.cz.md](README.cz.md)*
+
 A self-hosted game portal for indie developers. Think personal itch.io, no accounts, no platform fees, your games on your server.
 
 ## What It Does
@@ -12,7 +14,8 @@ A self-hosted game portal for indie developers. Think personal itch.io, no accou
 - **itch.io sync**: Import game metadata from any itch.io page, single game or bulk profile import. Pulls title, description, tags, screenshots, cover art, YouTube trailers, and all metadata. No binaries copied, just the catalog data you need to rebuild your portfolio on your own terms
 - **Rich social previews**: OG meta tags and Twitter cards for Discord, Twitter, Facebook link embeds
 - **Your branding**: Site name, title, tagline, navigation, all configurable. Tickle is the engine; your site is the product
-- **Zero dependencies**: Python stdlib server for admin, no NPM, no frameworks, no build tools, no databases, just a server
+- **User Accounts & Roles**: Integrated SQLite database for user registration and logins. The first user becomes the admin, and subsequent users become students. Students can only manage their own games, making it perfect for school game jams and classrooms!
+- **Zero dependencies**: Python stdlib server for admin, no NPM, no frameworks, no build tools, no complex databases to configure, just a server
 
 Demo Video:
 
@@ -181,6 +184,10 @@ I spent more hours than a newborn really should allow, hours testing it on my ow
 This is not "make me an itch.io clone", this is something I thought should exist and utilized AI as a tool to help bring it to fruition, both as a method to accelerate development and for my own learning and curiosity about how these tools could be used going forward.
 
 The use of AI may mean you will just ignore this tool, and that's fine, but if not, I hope you enjoy it, and if you are so inclined, help to improve it.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a history of updates, fixes, and improvements to the project (including network and Docker updates for LAN access).
 
 ## License
 

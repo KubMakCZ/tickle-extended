@@ -718,6 +718,8 @@
     }
     .topbar-actions .btn { padding: 5px 10px; font-size: 0.72rem; }
   }
+    .role-student .admin-only { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -732,17 +734,41 @@
     </a>
     <div class="admin-nav" id="adminNav">
       <button class="active" onclick="showView('games')">Games</button>
-      <button onclick="showView('settings')">Site Settings</button>
+      <button class="admin-only" onclick="showView('settings')">Site Settings</button>
     </div>
   </div>
   <div class="topbar-actions" id="topbarActions">
-    <button class="btn btn-secondary" onclick="generateAll()">Generate All</button>
+    <button class="btn btn-secondary admin-only" onclick="generateAll()">Generate All</button>
     <a href="/preview/" target="_blank" class="btn btn-secondary">Preview Site</a>
+    <button class="btn btn-secondary" onclick="logout()">Logout</button>
     <a href="/" class="btn btn-exit">Exit Admin</a>
   </div>
 </nav>
 
 <div class="main">
+
+  <!-- ═══ LOGIN ═══ -->
+  <div class="view" id="loginView">
+    <div class="setup-card" style="max-width:400px;margin:10vh auto;border:1px solid var(--border);border-radius:12px;padding:32px;background:var(--bg)">
+      <h1 style="margin-bottom:8px">Login</h1>
+      <p style="margin-bottom:24px;color:var(--text-muted);font-size:0.9rem;">Sign in to your account or create a new one.</p>
+      <form onsubmit="submitAuth(event)">
+        <div class="form-group">
+          <label>Username</label>
+          <input class="form-input" id="authUsername" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input class="form-input" id="authPassword" type="password" required>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center;" onclick="document.getElementById('authAction').value='login'">Login</button>
+          <button type="submit" class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="document.getElementById('authAction').value='register'">Register</button>
+        </div>
+        <input type="hidden" id="authAction" value="login">
+      </form>
+    </div>
+  </div>
 
   <!-- ═══ SETUP ═══ -->
   <div class="view" id="setupView">
@@ -882,6 +908,10 @@ async function api(path, opts) {
     method: opts.method || 'GET',
     body: opts.body,
   });
+  if (res.status === 401 && path !== '/me' && path !== '/login' && path !== '/register') {
+    showView('login');
+    throw new Error('Not logged in');
+  }
   return res.json();
 }
 
@@ -976,18 +1006,67 @@ async function applyAdminTheme(themeName) {
   }
 }
 
+async function checkAuth() {
+  var res = await fetch('/api/me');
+  if (res.status === 401) {
+    showView('login');
+    document.getElementById('adminNav').style.display = 'none';
+    document.getElementById('topbarActions').style.display = 'none';
+    return;
+  }
+  var user = await res.json();
+  window.currentUser = user;
+  if (user.role === 'student') {
+    document.body.classList.add('role-student');
+  }
+  document.getElementById('adminNav').style.display = 'flex';
+  document.getElementById('topbarActions').style.display = 'flex';
+  checkSetup();
+}
+
+async function submitAuth(e) {
+  e.preventDefault();
+  var user = document.getElementById('authUsername').value.trim();
+  var pass = document.getElementById('authPassword').value;
+  var action = document.getElementById('authAction').value;
+  try {
+    var res = await fetch('/api/' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      checkAuth();
+    } else {
+      toast(data.error || 'Login failed', 'error');
+    }
+  } catch (err) {
+    toast('Error connecting to server', 'error');
+  }
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.reload();
+}
+
 async function checkSetup() {
-  var data = await api('/site');
-  if (!data || data.exists === false || !data.site_name) {
-    updateAdminLogo();
-    showView('setup');
-  } else {
-    siteConfig = data;
-    updateAdminLogo();
-    updateExitLink();
-    applyAdminTheme(data.theme);
-    updateBgPreview();
-    showView('games');
+  try {
+    var data = await api('/site');
+    if (!data || data.exists === false || !data.site_name) {
+      updateAdminLogo();
+      showView('setup');
+    } else {
+      siteConfig = data;
+      updateAdminLogo();
+      updateExitLink();
+      applyAdminTheme(data.theme);
+      updateBgPreview();
+      showView('games');
+    }
+  } catch (e) {
+    // handled by api() 401 wrapper
   }
 }
 
@@ -2819,7 +2898,7 @@ async function bulkItchImport() {
 //  BOOT
 // ═══════════════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', checkSetup);
+document.addEventListener('DOMContentLoaded', checkAuth);
 </script>
 
 <div class="admin-footer">powered by <a href="/admin">tickle</a></div>
