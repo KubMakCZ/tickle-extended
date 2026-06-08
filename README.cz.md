@@ -72,6 +72,15 @@ Z administrátorského panelu:
 - **Retro hry**: V editoru přepněte režim Web Player Build na EmulatorJS, vyberte konzoli, nahrajte ROM soubor.
 - **3D Modely**: Nastavte Classification na 3D Print, nahrajte .stl soubory. Web automaticky zobrazí 3D vizualizátor.
 
+## Školní Game Jamy a Třídy (Uživatelé a Role)
+
+Tickle Extended obsahuje zabudovaný autentizační systém postavený na lokální databázi SQLite (`db.sqlite3` uvnitř složky `output/`). Tento systém je navržen tak, aby ideálně sloužil při pořádání školních Game Jamů nebo ve výuce IT:
+
+- **Admin Účet**: Úplně první uživatel, který se do systému zaregistruje, se automaticky stává administrátorem. Má plná práva na úpravy nastavení, mazání cizích her a vidí vše.
+- **Studenti**: Každý další zaregistrovaný uživatel automaticky získá roli studenta.
+- **Soukromí a Vlastnictví**: Studenti vidí všechny nahrané hry svých spolužáků jak na veřejném portálu, tak v administraci (v režimu pouze pro čtení – rovnou se jim spustí náhled). Upravovat nebo mazat však mohou **pouze** své vlastní vytvořené hry.
+- **Filtrování podle tříd**: Při nahrávání hry může student vyplnit textové políčko "Třída" (např. "1.I"). Veřejný portál si tyto třídy automaticky nasčítá a vytvoří na levé straně menu, díky kterému mohou návštěvníci i žáci snadno najít a filtrovat hry od konkrétních tříd!
+
 ## Nasazení
 
 Složka `output/` obsahuje celý statický web. Můžete ji zkopírovat na libovolný Apache/Nginx webhosting.

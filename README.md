@@ -117,6 +117,15 @@ Tickle also supports a **3D Print** content type for showcasing models and physi
 3. The generated page features an interactive Three.js viewer with orbit controls, adjustable lighting, and a thumbnail carousel when you have multiple models
 4. Optionally toggle model downloads on/off per entry
 
+## School Game Jams & Classrooms (Users & Roles)
+
+Tickle Extended comes with a built-in zero-dependency SQLite authentication system (`db.sqlite3` located in `output/`), making it the perfect platform for hosting school-wide Game Jams or managing IT classrooms:
+
+- **Admin Account**: The very first user to register automatically becomes the `admin`. The admin can manage site settings, see all games, and edit/delete any entry.
+- **Student Accounts**: Anyone who registers after the admin gets a standard `student` role.
+- **Ownership & Privacy**: Students can view all games from their peers on the portal and inside the admin panel (read-only mode), but they can only edit, modify, or delete their own games.
+- **Class Filtering**: When creating a game, students can input their class (e.g., "1.I"). The portal automatically aggregates these classes and creates a "Filter by Class" menu on the sidebar, allowing visitors to easily browse entries from specific classes.
+
 ## Deploy
 
 The `output/` directory is your complete static site. Upload it however you like:
