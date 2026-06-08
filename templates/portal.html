@@ -60,6 +60,14 @@
 <!--IF:show_browse_panel-->
 <div class="portal-browse-layout">
   <aside class="portal-sidebar">
+    <!--IF:classes_browse_html-->
+    <div class="browse-section">
+      <h3>Třídy</h3>
+      <div class="browse-grid">
+        {{classes_browse_html}}
+      </div>
+    </div>
+    <!--ENDIF:classes_browse_html-->
     <div class="browse-section">
       <h3>Tags</h3>
       <div class="browse-grid">
@@ -140,6 +148,7 @@
 let currentFilter = 'all';
 let currentTag = '';
 let currentGenre = '';
+let currentClass = '';
 
 function setFilter(type, btn) {
   currentFilter = type;
@@ -159,6 +168,8 @@ function setBrowseTag(tag, el) {
   }
   currentGenre = '';
   document.querySelectorAll('.browse-genre').forEach(t => t.classList.remove('active'));
+  currentClass = '';
+  document.querySelectorAll('.browse-class').forEach(t => t.classList.remove('active'));
   updateURL();
   filterGames();
 }
@@ -174,6 +185,25 @@ function setBrowseGenre(genre, el) {
   }
   currentTag = '';
   document.querySelectorAll('.browse-tag').forEach(t => t.classList.remove('active'));
+  currentClass = '';
+  document.querySelectorAll('.browse-class').forEach(t => t.classList.remove('active'));
+  updateURL();
+  filterGames();
+}
+
+function setBrowseClass(cls, el) {
+  if (currentClass === cls) {
+    currentClass = '';
+    el.classList.remove('active');
+  } else {
+    currentClass = cls;
+    document.querySelectorAll('.browse-class').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+  currentTag = '';
+  document.querySelectorAll('.browse-tag').forEach(t => t.classList.remove('active'));
+  currentGenre = '';
+  document.querySelectorAll('.browse-genre').forEach(t => t.classList.remove('active'));
   updateURL();
   filterGames();
 }
@@ -182,8 +212,10 @@ function updateURL() {
   const url = new URL(window.location);
   url.searchParams.delete('tag');
   url.searchParams.delete('genre');
+  url.searchParams.delete('class');
   if (currentTag) url.searchParams.set('tag', currentTag);
   if (currentGenre) url.searchParams.set('genre', currentGenre);
+  if (currentClass) url.searchParams.set('class', currentClass);
   history.replaceState(null, '', url);
 }
 
@@ -200,8 +232,9 @@ function filterGames() {
       || (card.querySelector('.card-desc')?.textContent || '').toLowerCase().includes(query);
     const matchTag = !currentTag || card.dataset.tags.split(',').includes(currentTag);
     const matchGenre = !currentGenre || card.dataset.genre.split(', ').includes(currentGenre);
+    const matchClass = !currentClass || card.dataset.class === currentClass;
 
-    if (matchType && matchSearch && matchTag && matchGenre) {
+    if (matchType && matchSearch && matchTag && matchGenre && matchClass) {
       card.classList.remove('hidden');
       visible++;
     } else {
@@ -217,6 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const params = new URLSearchParams(window.location.search);
   const urlTag = params.get('tag');
   const urlGenre = params.get('genre');
+  const urlClass = params.get('class');
 
   // Bind click handlers on browse items
   document.querySelectorAll('.browse-tag').forEach(el => {
@@ -231,6 +265,12 @@ document.addEventListener('DOMContentLoaded', function() {
       setBrowseGenre(this.dataset.genre, this);
     });
   });
+  document.querySelectorAll('.browse-class').forEach(el => {
+    el.addEventListener('click', function(e) {
+      e.preventDefault();
+      setBrowseClass(this.dataset.class, this);
+    });
+  });
 
   // Apply URL params
   if (urlTag) {
@@ -243,6 +283,12 @@ document.addEventListener('DOMContentLoaded', function() {
     currentGenre = urlGenre;
     document.querySelectorAll('.browse-genre').forEach(el => {
       if (el.dataset.genre === urlGenre) el.classList.add('active');
+    });
+    filterGames();
+  } else if (urlClass) {
+    currentClass = urlClass;
+    document.querySelectorAll('.browse-class').forEach(el => {
+      if (el.dataset.class === urlClass) el.classList.add('active');
     });
     filterGames();
   } else {

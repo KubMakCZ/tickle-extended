@@ -496,7 +496,7 @@ def build_card_html(game):
     engine = game.get('engine', '')
 
     genre = game.get('genre', '').lower()
-    return f'''<a href="games/{slug}/index.html" class="game-card" data-type="{game.get('type', 'game')}" data-title="{title.lower()}" data-tags="{','.join(t.lower() for t in tags)}" data-genre="{genre}">
+    return f'''<a href="games/{slug}/index.html" class="game-card" data-type="{game.get('type', 'game')}" data-title="{title.lower()}" data-tags="{','.join(t.lower() for t in tags)}" data-genre="{genre}" data-class="{school_class}">
     <div class="card-image">
       {img_html}
       <span class="status-badge {status}">{status_label}</span>
@@ -593,6 +593,7 @@ def generate_portal(site, games):
     if show_browse_panel:
         tag_counts = {}
         genre_counts = {}
+        class_counts = {}
         for g in visible_games:
             for t in g.get('tags', []):
                 t_lower = t.lower().strip()
@@ -603,9 +604,13 @@ def generate_portal(site, games):
                 if genre_str:
                     g_lower = genre_str.lower()
                     genre_counts[g_lower] = genre_counts.get(g_lower, 0) + 1
+            cls_str = (g.get('school_class', '') or '').strip()
+            if cls_str:
+                class_counts[cls_str] = class_counts.get(cls_str, 0) + 1
 
         sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
         sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
+        sorted_classes = sorted(class_counts.items(), key=lambda x: x[0])
 
         def build_browse_items(items, cls, param):
             if not items:
@@ -625,6 +630,9 @@ def generate_portal(site, games):
 
         tags_browse_html = build_browse_items(sorted_tags, 'browse-tag', 'tag')
         genres_browse_html = build_browse_items(sorted_genres, 'browse-genre', 'genre')
+        classes_browse_html = build_browse_items(sorted_classes, 'browse-class', 'class')
+    else:
+        classes_browse_html = ''
 
     context = {
         'site': {**site, 'nav_links': nav_links, 'site_title_html': site_title_html},
@@ -640,6 +648,7 @@ def generate_portal(site, games):
         'show_browse_panel': show_browse_panel,
         'tags_browse_html': tags_browse_html,
         'genres_browse_html': genres_browse_html,
+        'classes_browse_html': classes_browse_html,
         'social_heading': site.get('social_heading', 'Socials'),
         'social_icons_html': build_social_icons_html(site.get('social_links', [])),
         'social_icons_inline': '1' if (not show_browse_panel and site.get('social_links') and site.get('support_links')) else '',
