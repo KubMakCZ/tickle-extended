@@ -1793,6 +1793,17 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
     <meta charset="utf-8">
     <title>Python Game</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2025.2.1/core.css" />
+    <script>
+        if (!window.crypto) window.crypto = {};
+        if (!window.crypto.randomUUID) {
+            window.crypto.randomUUID = function() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            };
+        }
+    </script>
     <script type="module" src="https://pyscript.net/releases/2025.2.1/core.js"></script>
     <style>
         body {{ background-color: #1e1e1e; color: #fff; margin: 0; padding: 10px; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; flex-direction: column; overflow: auto; }}
