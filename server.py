@@ -1786,7 +1786,47 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     safe_name = re.sub(r'[^\w.\-]', '_', filename)
                     (webgl_dir / safe_name).write_bytes(file_data)
-                    self.send_json({'ok': True, 'filename': 'webgl/' + safe_name})
+                    if safe_name.lower().endswith('.py'):
+                        html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Python Game</title>
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <style>
+        body {{ background-color: #1e1e1e; color: #fff; margin: 0; padding: 10px; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; }}
+        py-terminal {{ background-color: #000; color: #fff; width: 100%; height: 100%; }}
+        canvas {{ max-width: 100%; max-height: 100vh; outline: none; }}
+    </style>
+</head>
+<body>
+    <py-config>
+        packages = ["pygame-ce"]
+    </py-config>
+    <py-script src="./{safe_name}"></py-script>
+</body>
+</html>"""
+                        (webgl_dir / 'index.html').write_text(html_content, encoding='utf-8')
+                        
+                        games = get_games()
+                        for g in games:
+                            if g.get('slug') == slug:
+                                g['engine'] = 'python'
+                                g['game_file'] = 'webgl/index.html'
+                                dl = g.get('downloads', [])
+                                dl.append({
+                                    'platform': 'other',
+                                    'file': f'webgl/{safe_name}',
+                                    'size': f'{len(file_data) / 1024:.0f}KB' if len(file_data) < 1024*1024 else f'{len(file_data) / (1024*1024):.1f}MB'
+                                })
+                                g['downloads'] = dl
+                                g['date_updated'] = str(date.today())
+                                break
+                        save_games(games)
+                        self.send_json({'ok': True, 'filename': 'webgl/index.html', 'detection': {'engine': 'python', 'game_file': 'webgl/index.html', 'detected': True}})
+                    else:
+                        self.send_json({'ok': True, 'filename': 'webgl/' + safe_name})
 
             elif upload_type == 'model':
                 # 3D model file — save to models/ subfolder

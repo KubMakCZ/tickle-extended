@@ -1489,7 +1489,7 @@ function renderBuildSection(game) {
       ' ondrop="handleBuildDrop(event)">' +
         '<strong>Upload game build</strong><br>' +
         '<span style="font-size:0.75rem;color:var(--text-muted);">Drop a .zip of your Godot/Unity web export here, or click to browse.<br>The zip will be extracted into the game folder.</span>' +
-        '<input type="file" id="buildFileInput" accept=".zip,.html,.wasm,.pck,.js,.data" multiple onchange="uploadBuildFiles(this.files)">' +
+        '<input type="file" id="buildFileInput" accept=".zip,.html,.wasm,.pck,.js,.data,.py" multiple onchange="uploadBuildFiles(this.files)">' +
       '</div>' +
       '<div id="engineDetectInfo"></div>' +
       '<div id="buildFileList"></div>';
