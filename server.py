@@ -1286,11 +1286,14 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', allowed)
             self.send_header('Access-Control-Allow-Credentials', 'true')
 
-    def send_json(self, data, status=200):
+    def send_json(self, data, status=200, headers=None):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', len(body))
+        if headers:
+            for k, v in headers.items():
+                self.send_header(k, v)
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(body)
@@ -1437,8 +1440,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                 if row and row['password_hash'] == hash_password(password):
                     session_id = secrets.token_hex(32)
                     conn.execute('INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, datetime("now", "+30 days"))', (session_id, row['id']))
-                    self.send_header('Set-Cookie', f'session_id={session_id}; Path=/; HttpOnly')
-                    self.send_json({'ok': True, 'role': row['role']})
+                    self.send_json({'ok': True, 'role': row['role']}, headers={'Set-Cookie': f'session_id={session_id}; Path=/; HttpOnly'})
                 else:
                     self.send_error_json('Invalid credentials', 401)
             return True
@@ -1458,8 +1460,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     conn.execute('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)', (user_id, username, hash_password(password), role))
                     session_id = secrets.token_hex(32)
                     conn.execute('INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, datetime("now", "+30 days"))', (session_id, user_id))
-                    self.send_header('Set-Cookie', f'session_id={session_id}; Path=/; HttpOnly')
-                    self.send_json({'ok': True, 'role': role})
+                    self.send_json({'ok': True, 'role': role}, headers={'Set-Cookie': f'session_id={session_id}; Path=/; HttpOnly'})
                 except sqlite3.IntegrityError:
                     self.send_error_json('Username already taken')
             return True
@@ -1472,8 +1473,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     session_id = cookie[11:]
                     with get_db() as conn:
                         conn.execute('DELETE FROM sessions WHERE session_id = ?', (session_id,))
-            self.send_header('Set-Cookie', 'session_id=; Path=/; HttpOnly; Max-Age=0')
-            self.send_json({'ok': True})
+            self.send_json({'ok': True}, headers={'Set-Cookie': 'session_id=; Path=/; HttpOnly; Max-Age=0'})
             return True
 
         # Public endpoints that don't need auth:
