@@ -1792,19 +1792,15 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 <head>
     <meta charset="utf-8">
     <title>Python Game</title>
-    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
-    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        body {{ background-color: #1e1e1e; color: #fff; margin: 0; padding: 10px; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; }}
-        py-terminal {{ background-color: #000; color: #fff; width: 100%; height: 100%; }}
+        body {{ background-color: #1e1e1e; color: #fff; margin: 0; padding: 10px; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; flex-direction: column; overflow: auto; }}
         canvas {{ max-width: 100%; max-height: 100vh; outline: none; }}
     </style>
 </head>
 <body>
-    <py-config>
-        packages = ["pygame-ce"]
-    </py-config>
-    <py-script src="./{safe_name}"></py-script>
+    <script type="py" src="./{safe_name}" config='{{"packages":["pygame-ce"]}}' terminal></script>
 </body>
 </html>"""
                         (webgl_dir / 'index.html').write_text(html_content, encoding='utf-8')
