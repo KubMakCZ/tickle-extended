@@ -1816,6 +1816,19 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                         code = file_data.decode('utf-8', errors='ignore')
                         is_pygame = 'import pygame' in code or 'from pygame' in code
                         
+                        # Inject os.system polyfill so clear screen commands work in web terminal
+                        is_nt = 'cls' in code
+                        os_name_str = 'nt' if is_nt else 'posix'
+                        polyfill = (
+                            "import os\n"
+                            "if not hasattr(os, 'system'):\n"
+                            "    os.system = lambda cmd: print('\\033[2J\\033[H', end='') if cmd in ('clear', 'cls') else 0\n"
+                            f"    os.name = '{os_name_str}'\n\n"
+                        )
+                        patched_code = polyfill + code
+                        (webgl_dir / safe_name).write_text(patched_code, encoding='utf-8')
+                        
+                        
                         if is_pygame:
                             canvas_tag = '<canvas id="canvas"></canvas>'
                             script_tag = f'<script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>'
