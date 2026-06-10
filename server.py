@@ -1821,7 +1821,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                             script_tag = f'<script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>'
                         else:
                             canvas_tag = ''
-                            script_tag = f'<script type="py" src="./{safe_name}" config="{{}}" terminal worker></script>'
+                            script_tag = f'<script type="mpy" src="./{safe_name}" config="{{}}" terminal worker></script>'
 
                         html_content = f"""<!DOCTYPE html>
 <html lang="en">
