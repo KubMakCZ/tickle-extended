@@ -1812,7 +1812,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
 </head>
 <body>
     <canvas id="canvas"></canvas>
-    <script type="py-game" src="./{safe_name}" terminal></script>
+    <script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>
 </body>
 </html>"""
                         (webgl_dir / 'index.html').write_text(html_content, encoding='utf-8')
