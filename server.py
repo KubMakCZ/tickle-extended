@@ -1816,18 +1816,14 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                         code = file_data.decode('utf-8', errors='ignore')
                         is_pygame = 'import pygame' in code or 'from pygame' in code
                         
+                        # Inject os.system polyfill so clear screen commands work in web terminal
                         is_nt = 'cls' in code
                         os_name_str = 'nt' if is_nt else 'posix'
                         polyfill = (
-                            "import os, builtins\n"
+                            "import os\n"
                             "if not hasattr(os, 'system'):\n"
                             "    os.system = lambda cmd: print('\\033[2J\\033[H', end='') if cmd in ('clear', 'cls') else 0\n"
-                            f"    os.name = '{os_name_str}'\n"
-                            "    _orig_print = builtins.print\n"
-                            "    def _patched_print(*args, **kwargs):\n"
-                            "        kwargs.pop('flush', None)\n"
-                            "        _orig_print(*args, **kwargs)\n"
-                            "    builtins.print = _patched_print\n\n"
+                            f"    os.name = '{os_name_str}'\n\n"
                         )
                         patched_code = polyfill + code
                         (webgl_dir / safe_name).write_text(patched_code, encoding='utf-8')
@@ -1838,7 +1834,7 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                             script_tag = f'<script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>'
                         else:
                             canvas_tag = ''
-                            script_tag = f'<script type="mpy" src="./{safe_name}" config="{{}}" terminal worker></script>'
+                            script_tag = f'<script type="py" src="./{safe_name}" config="{{}}" terminal worker></script>'
 
                         html_content = f"""<!DOCTYPE html>
 <html lang="en">
