@@ -1813,6 +1813,16 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
                     safe_name = re.sub(r'[^\w.\-]', '_', filename)
                     (webgl_dir / safe_name).write_bytes(file_data)
                     if safe_name.lower().endswith('.py'):
+                        code = file_data.decode('utf-8', errors='ignore')
+                        is_pygame = 'import pygame' in code or 'from pygame' in code
+                        
+                        if is_pygame:
+                            canvas_tag = '<canvas id="canvas"></canvas>'
+                            script_tag = f'<script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>'
+                        else:
+                            canvas_tag = ''
+                            script_tag = f'<script type="py" src="./{safe_name}" config="{{}}" terminal worker></script>'
+
                         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1837,8 +1847,8 @@ class TickleHandler(http.server.BaseHTTPRequestHandler):
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <script type="py-game" src="./{safe_name}" config="{{}}" terminal></script>
+    {canvas_tag}
+    {script_tag}
 </body>
 </html>"""
                         (webgl_dir / 'index.html').write_text(html_content, encoding='utf-8')
