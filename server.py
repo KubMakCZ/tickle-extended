@@ -2365,11 +2365,17 @@ def detect_engine(game_dir):
     # Godot: look for .pck + .wasm + .html
     has_pck = any(f.endswith('.pck') for f in files_lower)
     has_wasm = any(f.endswith('.wasm') for f in files_lower)
-    has_html = any(f.endswith('.html') and f != 'index.html' for f in files_lower)
+    html_files = [f for f in files if f.lower().endswith('.html')]
 
     if has_pck and has_wasm:
-        game_file = next((f for f in files if f.lower().endswith('.html') and f.lower() != 'index.html'), None)
+        game_file = next((f for f in html_files if f.lower() != 'index.html'), next((f for f in html_files if f.lower() == 'index.html'), None))
         return {'engine': 'godot', 'game_file': game_file, 'detected': True}
+
+    # Ren'Py: look for renpy-pre.js or renpy.js + .wasm
+    has_renpy_js = any(f.startswith('renpy') and f.endswith('.js') for f in files_lower)
+    if has_renpy_js and has_wasm:
+        game_file = next((f for f in html_files if f.lower() != 'index.html'), next((f for f in html_files if f.lower() == 'index.html'), None))
+        return {'engine': 'renpy', 'game_file': game_file, 'detected': True}
 
     # Unity: look for Build/ directory
     build_dir = game_dir / 'Build'
@@ -2378,7 +2384,7 @@ def detect_engine(game_dir):
         has_framework = any(f.endswith('.framework.js') for f in build_files)
         has_loader = any('UnityLoader' in f for f in build_files) or has_framework
         if has_loader:
-            game_file = next((f for f in files if f.lower().endswith('.html') and f.lower() != 'index.html'), None)
+            game_file = next((f for f in html_files if f.lower() != 'index.html'), next((f for f in html_files if f.lower() == 'index.html'), None))
             return {'engine': 'unity', 'game_file': game_file, 'detected': True}
 
     return {'engine': None, 'detected': False}

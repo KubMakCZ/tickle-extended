@@ -1488,7 +1488,7 @@ function renderBuildSection(game) {
       ' ondragleave="this.classList.remove(\'dragover\')"' +
       ' ondrop="handleBuildDrop(event)">' +
         '<strong>Upload game build</strong><br>' +
-        '<span style="font-size:0.75rem;color:var(--text-muted);">Drop a .zip of your Godot/Unity web export here, or click to browse.<br>The zip will be extracted into the game folder.</span>' +
+        '<span style="font-size:0.75rem;color:var(--text-muted);">Drop a .zip of your Godot/Unity/Ren\'Py web export or a .py script here.<br>The zip will be extracted into the game folder.</span>' +
         '<input type="file" id="buildFileInput" accept=".zip,.html,.wasm,.pck,.js,.data,.py" multiple onchange="uploadBuildFiles(this.files)">' +
       '</div>' +
       '<div id="engineDetectInfo"></div>' +
@@ -1745,7 +1745,7 @@ async function loadBuildInfo(slug) {
   var detectEl = document.getElementById('engineDetectInfo');
   if (detectEl) {
     if (detection.detected) {
-      var engineName = detection.engine === 'godot' ? 'Godot' : 'Unity';
+      var engineName = detection.engine === 'renpy' ? "Ren'Py" : (detection.engine.charAt(0).toUpperCase() + detection.engine.slice(1));
       var cls = 'detected';
       var icon = '\u2705';
       var msg = engineName + ' detected';
@@ -1762,7 +1762,7 @@ async function loadBuildInfo(slug) {
 
       // Auto-populate fields if empty
       if (!currentGame.engine && detection.engine) {
-        currentGame.engine = detection.engine === 'godot' ? 'Godot' : 'Unity';
+        currentGame.engine = detection.engine === 'renpy' ? "Ren'Py" : (detection.engine.charAt(0).toUpperCase() + detection.engine.slice(1));
         var ef = document.getElementById('engineField');
         if (ef) ef.value = currentGame.engine;
       }
@@ -1775,7 +1775,7 @@ async function loadBuildInfo(slug) {
     } else {
       detectEl.innerHTML = '<div class="engine-detect none">' +
         '<span class="engine-detect-icon">\u2014</span>' +
-        '<span>No engine detected. Upload a Godot (.pck + .wasm + .html) or Unity (Build/ folder) web export as a .zip.</span></div>';
+        '<span>No engine detected. Upload a supported web export (.zip) or Python script (.py).</span></div>';
     }
   }
 
@@ -2006,7 +2006,7 @@ async function uploadBuildFiles(files) {
     } else if (result.extracted) {
       toast('Extracted ' + result.extracted.length + ' files', 'success');
       if (result.detection && result.detection.detected) {
-        var eng = result.detection.engine === 'godot' ? 'Godot' : 'Unity';
+        var eng = result.detection.engine === 'renpy' ? "Ren'Py" : (result.detection.engine.charAt(0).toUpperCase() + result.detection.engine.slice(1));
         toast(eng + ' detected! Game file: ' + (result.detection.game_file || 'none'), 'success');
       }
     } else {
