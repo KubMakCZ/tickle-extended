@@ -1210,6 +1210,32 @@ class PublicHandler(http.server.BaseHTTPRequestHandler):
     """Serves only output/ files. No admin, no API."""
 
     def do_GET(self):
+        path = urllib.parse.unquote(urllib.parse.urlparse(self.path).path).rstrip('/')
+        if path.startswith('/api/hit/'):
+            hit_match = re.match(r'^/api/hit/([a-z0-9-]+)$', path)
+            if hit_match:
+                slug = hit_match.group(1)
+                games = get_games()
+                for g in games:
+                    if g.get('slug') == slug:
+                        g['views'] = g.get('views', 0) + 1
+                        save_games(games)
+                        body = json.dumps({'views': g['views']}).encode()
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.send_header('Content-Length', len(body))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+            
+            body = b'{"views": 0}'
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', len(body))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         self._serve()
 
     def do_HEAD(self):
